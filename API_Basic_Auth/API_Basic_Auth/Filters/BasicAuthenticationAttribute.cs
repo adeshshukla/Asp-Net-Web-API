@@ -1,0 +1,68 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Security.Principal;
+using System.Threading;
+using System.Web;
+using System.Web.Http.Filters;
+using System.Net.Http;
+using System.Web.Http;
+using System.Web.Http.Description;
+using System.Web.Http.Controllers;
+using System.Diagnostics.Contracts;
+
+namespace API_Basic_Auth.Filters
+{
+    public class BasicAuthenticationAttribute : AuthorizationFilterAttribute
+    {
+        public override void OnAuthorization(System.Web.Http.Controllers.HttpActionContext actionContext)
+        {
+            if (SkipAuthorization(actionContext)) return;
+
+            if (actionContext.Request.Headers.Authorization != null)
+            {
+                var authToken = actionContext.Request.Headers
+                    .Authorization.Parameter;
+
+                // decoding authToken we get decode value in 'Username:Password' format  
+                var decodeauthToken = System.Text.Encoding.UTF8.GetString(
+                    Convert.FromBase64String(authToken));
+
+                // spliting decodeauthToken using ':'   
+                var arrUserNameandPassword = decodeauthToken.Split(':');
+
+                // at 0th postion of array we get username and at 1st we get password  
+                if (IsAuthorizedUser(arrUserNameandPassword[0], arrUserNameandPassword[1]))
+                {
+                    // setting current principle  
+                    Thread.CurrentPrincipal = new GenericPrincipal(
+                    new GenericIdentity(arrUserNameandPassword[0]), null);
+                }
+                else
+                {
+                    actionContext.Response = actionContext.Request.CreateResponse(HttpStatusCode.Unauthorized);
+                }
+            }
+            else
+            {
+                actionContext.Response = actionContext.Request.CreateResponse(HttpStatusCode.Unauthorized);
+            }
+        }
+
+        public static bool IsAuthorizedUser(string Username, string Password)
+        {
+            // In this method we can handle our database logic here...  
+            return Username == "adesh" && Password == "12345";
+        }
+
+        private static bool SkipAuthorization(HttpActionContext actionContext)
+        {
+            //if (actionContext == null) return false;
+            Contract.Assert(actionContext != null);
+
+            return actionContext.ActionDescriptor.GetCustomAttributes<AllowAnonymousAttribute>().Any()
+                       || actionContext.ControllerContext.ControllerDescriptor.GetCustomAttributes<AllowAnonymousAttribute>().Any();
+        }
+    }
+}
